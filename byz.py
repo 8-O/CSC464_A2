@@ -7,6 +7,7 @@
 
   resource: https://marknelson.us/posts/2007/07/23/byzantine.html
 """
+import sys
 import copy
 from random import randint
 from collections import defaultdict
@@ -18,16 +19,30 @@ children = defaultdict(lambda: dict())
 ranked_paths = defaultdict(lambda: defaultdict(list))
 init_ids = dict()
 n = 7 #num processes
-m = 10 #num messages
+m = 4 #num messages (recursion level)
 t = 2 #num traitors
+leader_value = randint(0,1) #random command for leader 1:ATTACK 0:RETREAT
 
 def main():
+    if len(sys.argv) > 1:
+        global m
+        m = int(sys.argv[1]) #user sets recursion level
+        if len(sys.argv) > 2:
+            global n
+            n = int(sys.argv[2]) #user sets number of processes
+            if len(sys.argv) > 3:
+                if int(sys.argv[3]) in range(2):
+                    global leader_value
+                    leader_value = int(sys.argv[3]) #user sets ATTACK or RETREAT
+
     for i in range(n):
         traitor_ids[i] = False
         init_ids[i] = True
+
     create_children(m, n, init_ids, leader_id)
     for i in range(n):
         processes[i] = process(i)
+
     traitors = 0
     while traitors < t:
         i = randint(0,n-1)
@@ -36,9 +51,11 @@ def main():
         else:
             traitor_ids[i] = True
             traitors +=1
+
     for i in range(m+1):
         for j in range(n):
             processes[j].send_messages(i, processes)
+
     for i in range(n):
         if processes[i].pid is leader_id:
             print("Leader Process %s " % (i), end='')
@@ -47,7 +64,12 @@ def main():
             else:
                 print("commanded value %s." % (processes[i].nodes[''].input))
         else:
-            print("Process %s has decided on value %s" % (i, processes[i].decide()))
+            print("Process %s " % (i), end='')
+            if traitor_ids[i]:
+                print("is a traitor.")
+            else:
+                print("has decided on value %s." % (processes[i].decide()))
+
     return
 
 def create_children(m, n, pids, source, current_path ='', recursion =0):
@@ -72,10 +94,12 @@ class process():
         self.pid = id
         self.nodes = dict()
         if self.pid is leader_id:
-            value = randint(0,1)
+            value = leader_value
             self.nodes[''] = node(value, '?')
 
     def confirm_value(self, value):
+        if self.pid is leader_id:
+            return leader_value
         if traitor_ids[self.pid]:
             return randint(0,1)
         else:
@@ -127,7 +151,7 @@ class process():
         if tallies[0] < tallies[1]:
             return 1
         else:
-            return 0
+            return 0 #retreat on a tie
 
 if __name__ == '__main__':
     main()
